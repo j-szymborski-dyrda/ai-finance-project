@@ -1,0 +1,12 @@
+# Data files
+data/
+*.xlsx
+*.csv
+*.parquet
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.pyc
