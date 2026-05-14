@@ -210,3 +210,74 @@ def plot_crisis_vs_normal():
     plt.savefig(DATA_PATH / 'plot_crisis_vs_normal.png', dpi=150, bbox_inches='tight')
     plt.show()
     print("Saved to data/plot_crisis_vs_normal.png ✅")
+
+    # ── Function: summarise_predictions ───────────────────────
+# Computes statistical validation metrics for a model that
+# predicts volatility. Compares against the naive baseline
+# (real_vol_ann_lag1) which is what the benchmark uses.
+#
+# Parameters:
+#   monthly_results : DataFrame with columns:
+#       - real_vol_ann      : actual realized volatility
+#       - real_vol_ann_lag1 : naive baseline (last month's vol)
+#       - predicted_vol     : model's predicted volatility
+#       - high_vol_regime   : True/False crisis flag
+#       - date              : month end date
+#   label : str, name of the model
+
+def summarise_predictions(monthly_results, label):
+    from sklearn.metrics import mean_squared_error
+
+    r = monthly_results.copy()
+    r['date'] = pd.to_datetime(r['date'])
+
+    y_actual   = r['real_vol_ann']
+    y_pred     = r['predicted_vol']
+    y_baseline = r['real_vol_ann_lag1']
+
+    # ── R-squared formula ──────────────────────────────────
+    # OOS R-squared relative to naive baseline
+    # Positive means model beats simply using last month's vol
+    ss_res_model    = ((y_actual - y_pred) ** 2).sum()
+    ss_res_baseline = ((y_actual - y_baseline) ** 2).sum()
+    r2_oos = 1 - (ss_res_model / ss_res_baseline)
+
+    # Standard R-squared vs mean
+    ss_tot = ((y_actual - y_actual.mean()) ** 2).sum()
+    # ── Function: compare_predictions ─────────────────────────
+# Auto-detects all predictions_*.json files in data/
+# and prints a side by side comparison table
+
+def compare_predictions():
+    files = sorted(DATA_PATH.glob('predictions_*.json'))
+
+    if not files:
+        print("No prediction files found in data/. Run summarise_predictions() first.")
+        return
+
+    summaries = []
+    for f in files:
+        with open(f, 'r') as file:
+            summaries.append(json.load(file))
+
+    metrics = {
+        'OOS R-squared (full)'   : 'r2_oos',
+        'R-squared (vs mean)'    : 'r2',
+        'RMSE model'             : 'rmse_model',
+        'RMSE baseline'          : 'rmse_baseline',
+        'OOS R-squared (normal)' : 'r2_oos_normal',
+        'OOS R-squared (crisis)' : 'r2_oos_crisis',
+        'RMSE normal months'     : 'rmse_normal',
+        'RMSE crisis months'     : 'rmse_crisis',
+    }
+
+    table = pd.DataFrame(
+        {s['label']: {label: s[key] for label, key in metrics.items()} for s in summaries}
+    )
+
+    print("\n" + "=" * 55)
+    print("  PREDICTION COMPARISON")
+    print("=" * 55)
+    display(table.style.format("{:.4f}"))
+
+    return table
